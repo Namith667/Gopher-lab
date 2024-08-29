@@ -1,44 +1,51 @@
 package main
-
 import (
+	"encoding/json"
 	"fmt"
-	"html/template"
+	"log"
 	"net/http"
 )
 
-type LoginForm struct{
-	Name string;
-	Password string
+// Define a struct to represent the JSON structure
+type RequestData struct {
+	Name  string `json:"name"`
+	Age   int    `json:"age"`
+	Email string `json:"email"`
 }
 
-func main(){
-	http.HandleFunc("/login",loginHandler)
-	fmt.Println("Server started at http://localhost:8080")
-	http.ListenAndServe(":8080",nil)	
+type ResponseData struct {
+	Message string `json:"message"`
+	Status  string `json:"status"`
 }
 
-func loginHandler(w http.ResponseWriter, r *http.Request){
-	if r.Method==http.MethodGet{
-		tmpl := template.Must(template.ParseFiles("login.html"))
-		tmpl.Execute(w,nil)
-	}else if r.Method==http.MethodPost{
-		r.ParseForm()
-		form := LoginForm{
-			Name : r.FormValue("name"),
-			Password : r.FormValue("password"),
-		}
+func main() {
 
+	// Start the server
+	http.HandleFunc("/api", handleRequest)
+	fmt.Println("Server is running on http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
 
-	fmt.Printf("Login Attempt: Username=%s, Password=%s\n", form.Name, form.Password)
-	
-	if form.Name == "admin" && form.Password == "admin" {
-		
-		fmt.Fprintf(w, "Login successful for user: %s", form.Name)
-	}else{
-		err := http.StatusNotFound
-		fmt.Fprintf(w, "Login failed for user: %s", form.Name)
-		fmt.Fprintf(w,"Error: %d",err)
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
 	}
 
+	// Parse the request body
+	var requestData RequestData
+	err := json.NewDecoder(r.Body).Decode(&requestData)
+    if err != nil {
+        http.Error(w, "Error parsing request body", http.StatusBadRequest)
+        return
+    }
+
+	// Create a response
+	responseData := ResponseData{
+		Message: fmt.Sprintf("Hello, %s! We received your data. You are %d years old and your email is %s.", requestData.Name,requestData.Age, requestData.Email),
+		Status:  "Success",
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(responseData)
 }
