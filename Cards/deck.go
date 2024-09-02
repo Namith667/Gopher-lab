@@ -1,7 +1,14 @@
 package main
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
 
 type deck []string
+
+// arrstr :=[] string deck([])
 
 func newDeck() deck{
 	cards := deck{}
@@ -24,3 +31,17 @@ func (d deck) print(){
 func deal(d deck, handSize int ) (deck,deck){
 	return d[:handSize],d[handSize:]
 }
+
+//since deck contains many cards of string we need to 
+//convert all that cards to one sigle string seperated by commas
+//use strings.Join func
+func (d deck) toString() string{
+	return strings.Join([]string(d),",")
+}
+
+func (d deck) saveToFile(fileName string) error {
+	//converting to byteSlice
+	return os.WriteFile(fileName, []byte(d.toString()), 0666)
+
+}
+
