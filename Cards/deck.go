@@ -1,4 +1,5 @@
 package main
+
 import (
 	"fmt"
 	"os"
@@ -43,5 +44,14 @@ func (d deck) saveToFile(fileName string) error {
 	//converting to byteSlice
 	return os.WriteFile(fileName, []byte(d.toString()), 0666)
 
+}
+func newDeckFromFile(fileName string) deck{
+	bs, err  :=os.ReadFile(fileName) 
+	if err != nil{
+		fmt.Println("Error: ",err)
+		os.Exit(1)
+	}
+	s := strings.Split(string(bs),",")
+	return deck(s)
 }
 

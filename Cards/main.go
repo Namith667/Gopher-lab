@@ -1,10 +1,11 @@
 package main
 
-import "fmt"
+// import "fmt"
 
 //import "fmt"
 func main(){
-	cards := newDeck()
+	cards := newDeckFromFile("my_cards")
+	cards.print()
 	// hand,remainingCards := deal(cards,5)
 	// hand.print()
 	// remainingCards.print()
@@ -13,8 +14,9 @@ func main(){
 	// arrstr:=deck()
 	// bslice:=[]byte(str)
 	// fmt.Println(bslice)
-	fmt.Println(cards.toString())
-	cards.saveToFile("my_cards")
+	// fmt.Println(cards.toString())
+	// cards.saveToFile("my_cards")
+	// cards.newDeckFromFile("my_cards")
 
 	
 
