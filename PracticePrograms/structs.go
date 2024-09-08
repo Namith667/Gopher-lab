@@ -36,6 +36,9 @@ func main(){
 	jim.updateName("jiggy")
 	jim.print()
 	alex.print()
+
+
+	
 }
 	// fmt.Println(jim)
 	//fmt.Println(alex)
