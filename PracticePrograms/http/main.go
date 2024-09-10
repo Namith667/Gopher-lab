@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	//"io"
 	"net/http"
 	"os"
 )
@@ -14,5 +15,7 @@ func main(){
 		os.Exit(1)
 	}
 	fmt.Println(resp.Status,resp.Proto)
+	//n,err:=io.ReadCloser.Read(resp.Body)
+	
 
 }
