@@ -4,41 +4,37 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"log"
 	"os"
-
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	
 )
 
+type Database struct {
+    Client *mongo.Client
+}
+
+
 func main() {
-	 if err := godotenv.Load(); err != nil {
-	 	log.Println("No .env file found")
-	 }
+	
+	//error logging implemented instead of fmt
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("error in connecting database : ", err)
+	}
 
 	uri := os.Getenv("MONGODB_URI")
 	if uri == "" {
-		log.Fatal("Set your 'MONGODB_URI' environment variable. " +
-			"See: " +
-			"www.mongodb.com/docs/drivers/go/current/usage-examples/#environment-variable")
+		log.Fatal("Set the 'MONGODB_URI' environment variable. ")
 	}
-	client, err := mongo.Connect(context.TODO(), options.Client().
-		ApplyURI(uri))
-	if err != nil {
-		panic(err)
+	
+	db, err := NewDatabase(uri)
+
+	if err != nil{ 
+		log.Fatal("Error Connecting to Database ",err)
 	}
-
-	defer func() {
-		if err := client.Disconnect(context.TODO()); err != nil {
-			panic(err)
-		}
-	}()
-
-		//fmt.Println(client)
+	defer db.Disconnect()
 
 	for {
 		displayMenu()	
@@ -46,27 +42,78 @@ func main() {
 		fmt.Scanln(&ch)
 		switch ch {
 		case 1:
-				fmt.Println("-------creating----------")
-				create(client)					
+			fmt.Println("-------creating----------")
+			docs := []interface{}{
+				bson.D{{"firstName", "Erik"}, {"age", 27}},
+				bson.D{{"firstName", "Mohammad"}, {"lastName", "Ahmad"}, {"age", 10}},
+				bson.D{{"firstName", "Todd"},{"age",19}},
+				bson.D{{"firstName", "Juan"}, {"lastName", "Pablo"}},
+			}
+			result, err:= db.create("users",docs)	
+			if err != nil{
+				log.Fatalf("Error Creating Docs %v",err)
+			}
+			jsonData,_:=json.MarshalIndent(result,"","    ")	
+			fmt.Printf("%s\n ",jsonData)			
+
 		case 2:				
 			fmt.Println("------Read-------########")
-			fetchAndDisplayData(client, "sample_db", "users")				
+			users,err:= db.Read("users")
+			if err != nil{
+				log.Println("error Reading data ",err)
+			}
+			for _,user := range users{
+				jsonData,_ :=json.MarshalIndent(user,"","   ")
+				fmt.Printf("%s\n ",jsonData)
+			}
+
 		case 3:
 			fmt.Println("----------UPDATING------------")
-			update(client)
+			filter := bson.D{{"firstName", "Erik"}}
+			update := bson.D{{"$set", bson.D{{"lastName", "UPDATED!!!"}}}}
+			result, err := db.Update("users",filter,update)
+			if err != nil{
+				log.Println("Error Updatingg doc! ",err)
+			}
+			jsonData,_:=json.MarshalIndent(result,"","   ")
+			fmt.Printf("UPDATED! %s\n ",jsonData)
+
 		case 4: 
 			fmt.Println("------------Deleting----------")				
-			deleteRecords(client,"sample_db","users")
+			filter := bson.D{{"age", bson.D{{"$lt", 20}}}} // Example filter
+			result, err := db.Delete("users", filter)
+			if err != nil {
+				log.Fatalf("Error deleting documents: %v", err)
+			}
+			fmt.Printf("Documents deleted: %d\n", result.DeletedCount)
+
 		case 5: 
 			fmt.Println("Exiting!!")
 			os.Exit(0)
-					
+			
 		default:
 			fmt.Println("Invalid choice")
 		}
 	}
 }
 
+//for db connection
+func  NewDatabase(uri string)(*Database ,error){
+	client, err := mongo.Connect(context.TODO(),options.Client().ApplyURI(uri))
+	if err != nil{
+		return nil,err																	//review
+	}
+	return &Database{
+		Client: client,
+	},nil
+}
+
+//db disconnect
+func (db *Database) Disconnect() error{
+	return db.Client.Disconnect(context.TODO())
+}
+
+//displayMenu
 func displayMenu(){
 	fmt.Println("1. Create")
     fmt.Println("2. Read")
@@ -76,104 +123,54 @@ func displayMenu(){
     fmt.Print("Enter your choice: ")
 }
 
-func create(client *mongo.Client){
+//create docs
+func (db *Database) create (collectionName string,docs []interface{}) (*mongo.InsertManyResult,error){
 
-	coll := client.Database("sample_db").Collection("users")
-
-	docs := []interface{}{
-		bson.D{{"firstName", "Erik"}, {"age", 27}},
-		bson.D{{"firstName", "Mohammad"}, {"lastName", "Ahmad"}, {"age", 10}},
-		bson.D{{"firstName", "Todd"}},
-		bson.D{{"firstName", "Juan"}, {"lastName", "Pablo"}},
-	}
-	
+	coll := db.Client.Database("sample_db").Collection(collectionName)
 	result, err := coll.InsertMany(context.TODO(), docs)
-	jsonData, err := json.MarshalIndent(result, "", "    ")
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	fmt.Printf("%s\n", jsonData)
+	return result,nil
 }
 
-func update(client *mongo.Client) {
-	coll := client.Database("sample_db").Collection("users")
-	filter := bson.D{{"firstName", "Erik"}}
-	update := bson.D{{"$set", bson.D{{"lastName", "UPDATED!!!"},}},} 
+//read
+func (db *Database) Read(collectionName string) ([]bson.M,error){	
+	// access db and collection
+	coll := db.Client.Database("sample_db").Collection(collectionName)
+	cursor, err := coll.Find(context.TODO(), bson.M{})
 
+	if err != nil {
+	return nil, err
+	}
+
+	var results []bson.M
+	if err := cursor.All(context.TODO(),&results); err != nil{
+		return nil, err
+	}
+	return results,nil
+
+}
+
+//ipdate doc
+func (db *Database) Update (collectionName string,filter bson.D,update bson.D ) (*mongo.UpdateResult,error){
+	coll := db.Client.Database("sample_db").Collection(collectionName)
 	result, err := coll.UpdateOne(context.TODO(), filter, update)
 	if err != nil {
-			fmt.Println("Error updating document:", err)
-	} else {
-			fmt.Println("Document updated successfully:", result)
-			 // Fetch the updated document
-			var updatedDoc bson.M
-			err = coll.FindOne(context.TODO(), filter).Decode(&updatedDoc)
-			if err != nil {
-				fmt.Println("Error fetching updated document:", err)
-			} else {
-				fmt.Println("Updated document:", updatedDoc)
-			}
-	}
-	jsonData, err := json.MarshalIndent(result, "", "    ")
-	fmt.Printf("%s\n", jsonData)
-	fmt.Println("!!!!!!!!!!UPDATEd")
-}
-
-func fetchAndDisplayData(client *mongo.Client,dbName,collectionName string){	
-	// access db and collection
-    coll := client.Database(dbName).Collection(collectionName)
-
-    cur, err := coll.Find(context.TODO(), bson.M{})
-    if err != nil {
-        log.Fatalf("error fetching documents: %v", err)
-    }
-    defer cur.Close(context.TODO())
-
-    // check if there are any results
-    if !cur.Next(context.TODO()) {
-        fmt.Println("No documents found")
-        return
-    }
-    // Iterate over to display results
-    for {
-        var result bson.M
-        err := cur.Decode(&result)
-        if err != nil {
-            log.Fatalf("error decoding document: %v", err)
-        }
-
-        if len(result) == 0 {
-            fmt.Println("No data in document")
-        } else {
-            fmt.Println("Document:")
-            for key, value := range result {
-                fmt.Printf("%s: %v\n", key, value)
-            }
-        }
-        fmt.Println()
-
-        if !cur.Next(context.TODO()) {
-            break
-        }
-    }
-
-    if err := cur.Err(); err != nil {
-        log.Fatalf("cursor error: %v", err)
-    }
-}
-
-func deleteRecords(client *mongo.Client,dbName,collectionName string){
-	collection  := client.Database(dbName).Collection(collectionName)
-	filter := bson.D{{}}
-
-	//res, err := collection.DropAll(context.TODO())
+			log.Println("Error updating document:", err)
+	} 
+	return result,nil 
 	
-	res, err := collection.DeleteMany(context.TODO(),filter)
+}
+
+//delete matching docs
+func (db *Database) Delete(collectionName string, filter bson.D) (*mongo.DeleteResult,error){
+	collection  := db.Client.Database("sample_db").Collection(collectionName)
+	result, err := collection.DeleteMany(context.TODO(),filter)
 	if err != nil {
-		fmt.Println("Error dropping database:", err)
-	} else {
-		fmt.Println("Database dropped successfully. Number of documents deleted:", res.DeletedCount)
+		log.Println("Error dropping database:", err)
 	}
+	return result,nil
 }
 
 
