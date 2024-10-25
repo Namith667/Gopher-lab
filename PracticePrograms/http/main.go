@@ -9,11 +9,9 @@ import (
 
 type logWriter struct{}
 
-func main(){
-
-
-	resp, err :=http.Get("http://google.com")
-	if err!= nil{
+func main() {
+	resp, err := http.Get("http://google.com")
+	if err != nil {
 		fmt.Println("err: ", err)
 		os.Exit(1)
 	}
@@ -31,18 +29,8 @@ func main(){
 	// fmt.Println(string(bs))
 	
 	//alternate way
-	//io.Copy(os.Stdout,resp.Body)
-	
-	//implementing own custome type to implement io interface
-	
-	lw := logWriter{}
-	io.Copy(lw,resp.Body)
-	
 
-}
 
-func (logWriter) Write(bs []byte)(n int, err error){
-	fmt.Println(string(bs))
-	fmt.Println("Just wrote this many bytes: ",len(bs))
-	return len(bs), nil
-}
+	io.Copy(os.Stdout,resp.Body)
+
+
